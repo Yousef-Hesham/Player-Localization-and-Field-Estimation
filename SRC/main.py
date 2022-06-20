@@ -69,7 +69,9 @@ while cv2.waitKey(1) < 0:
 
     # Stop the program if reached end of video
     if not hasFrame:
-        print("Done processing... Output file is stored as ", output_video)
+        
+        if(write):
+            print("Done processing... Output file is stored as ", output_video)
 
         # Release device
         cv2.waitKey(3000)
