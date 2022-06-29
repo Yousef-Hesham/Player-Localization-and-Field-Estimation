@@ -1,10 +1,14 @@
 # Player-Localization-and-Field-Estimation
 Player-Localization-and-Field-Estimation
 
+Supervised by: Dr Mennatullah Siam
+Nile University
+
 ## Requirments
 
-- OpenCV >= 4.5.1  
-- Numpy >= 1.19
+```sh
+pip install -r requirements.txt
+```
 
 ## Setup
 - Download the contents of this [Folder](https://drive.google.com/drive/folders/11KnQ3_e4tMpHY8YDdH5GY0REZhYtqnL6?usp=sharing) and place them inside SRC/Data   
@@ -23,5 +27,3 @@ To run the project:
 ```sh
 python3 main.py --GPU --write
 ```
-
-

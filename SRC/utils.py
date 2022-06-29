@@ -2,20 +2,52 @@ import cv2
 import numpy as np
 
 from config import *
+from Homography.utils.utils import to_torch
+from Homography.utils.homography import warp_image
+from Homography.utils.image import torch_img_to_np_img, np_img_to_torch_img
 
 
 def calculate_centroid(left, top, right, bottom):
     return (int((left+right)/2), int((top+bottom)/2))
 
 
-# Draw the predicted bounding box
-def drawPred(frame, classId, conf, left, top, right, bottom, class_names, pts):
+def compute_corr_points(points1, H):
+   points1 = np.float32(points1).reshape(-1,1,2)
+   return cv2.perspectiveTransform(points1, H)
 
+def warp_point_torch2(pts, homography, input_shape = (1280,720,3)): # 1024, 1024, 3
+    img_test = np.zeros(input_shape)
+    dir_ = [0, -1, 1, -2, 2, 3, -3]
+    for dir_x in dir_:
+        for dir_y in dir_:
+            to_add_x = min(max(0, pts[0] + dir_x), input_shape[0]-1)
+            to_add_y = min(max(0, pts[1] + dir_y), input_shape[1]-1)
+            for i in range(3):
+                img_test[to_add_y, to_add_x, i] = 1.0
+    #print("img_test ",img_test)
+    pred_warp = warp_image(
+        np_img_to_torch_img(img_test), to_torch(homography), method="torch"
+    )
+    #print("pred_warp pre ",pred_warp)
+    pred_warp = torch_img_to_np_img(pred_warp[0])
+    #print("pred_warp post ",pred_warp)
+    indx = np.argwhere(pred_warp[:, :, 0] > 0.3)
+    #print("indx ",indx)
+    x, y = indx[:, 0].mean(), indx[:, 1].mean()
+    #print("x, y ", x,y)
+    dst = np.array([y, x])
+    return dst
+
+
+# Draw the predicted bounding box
+def drawPred(frame, classId, conf, left, top, right, bottom, class_names, pts, pred_homog, template):
+    
     # Draw a bounding box.
     if(class_names[classId] == 'Ball'):
         thickness = 2
     else:
         thickness = 1
+
     cv2.rectangle(frame, (left, top), (right, bottom), COLORS[str(classId)], thickness)
 
     label = '%.2f' % conf
@@ -36,22 +68,26 @@ def drawPred(frame, classId, conf, left, top, right, bottom, class_names, pts):
     midmap = 0 # 122
     # TODO: Clean this section of code. It could be better
     if(label != 'Ball'):
+
         cv2.rectangle(frame, (left, top - round(1.0*labelSize[1])), (left + round(1.0*labelSize[0]), top + baseLine), (255, 255, 255), cv2.FILLED)
         cv2.putText(frame, label, (left, top), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1)
+        
 
-        # Draw Map of each player
-        player_2D_x = (((center[0] - OldMin_x) * new_range_x) / old_range_x) + NewMin_x
-        player_2D_y = (((center[1] - OldMin_y) * new_range_y) / old_range_y) + NewMin_y
-        cv2.circle(frame, (int(player_2D_x) + x_offset+midmap, int(player_2D_y) + y_offset), 3, COLORS[str(classId)], 3)
+        # Warp Point
+        warped_point = warp_point_torch2([int(center[0]*0.7), int(center[1]*0.6)], pred_homog, input_shape=np.shape(template))
+      
+        if( not pd.isna(warped_point[0]) and not pd.isna(warped_point[1])):
+          cv2.circle(template, (int(warped_point[0]), int(warped_point[1])), 3, COLORS[str(classId)], 3)
     else:
         
         # Draw Circle on the Ball center
         cv2.circle(frame, center, 3, (0,0,255), 3)
         
         # Draw Map Position of the ball
-        ball_2D_x = (((center[0] - OldMin_x) * new_range_x) / old_range_x) + NewMin_x
-        ball_2D_y = (((center[1] - OldMin_y) * new_range_y) / old_range_y) + NewMin_y
-        cv2.circle(frame, (int(ball_2D_x) + x_offset+midmap, int(ball_2D_y) + y_offset), 3, (0,0,255), 3)
+        warped_point = warp_point_torch2([int(center[0]*0.7), int(center[1]*0.6)], pred_homog, input_shape=np.shape(template))
+        if( not pd.isna(warped_point[0]) and not pd.isna(warped_point[1])):
+          cv2.circle(template, (int(warped_point[0]), int(warped_point[1])), 3, (0,0,255), 3)
+
 
         pts.appendleft(center)
     
@@ -64,10 +100,12 @@ def drawPred(frame, classId, conf, left, top, right, bottom, class_names, pts):
         # draw the connecting lines
         thickness = int(np.sqrt(num_tracked_points / float(i + 1)) * 2.5)
         cv2.line(frame, pts[i - 1], pts[i], (0, 0, 255), thickness)
+    
+    return template
 
 
 
-def postprocess(frame, outs, class_names, pts):
+def postprocess(frame, outs, class_names, pts, pred_homo, template):
     frameHeight = frame.shape[0]
     frameWidth = frame.shape[1] 
  
@@ -107,7 +145,9 @@ def postprocess(frame, outs, class_names, pts):
         top = box[1]
         width = box[2]
         height = box[3]
-        drawPred(frame, classIds[i], confidences[i], left, top, left + width, top + height, class_names, pts)
+        template = drawPred(frame, classIds[i], confidences[i], left, top, left + width, top + height, class_names, pts, pred_homo, template)
+    
+    return template
 
 
 # Get the names of the output layers

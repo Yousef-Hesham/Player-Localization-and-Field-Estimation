@@ -1,7 +1,8 @@
 ''' Files '''
 input_video = 'Data/Video.mp4'
 output_video = "Data/Barca1.avi"
-
+output_map = "Data/map.avi"
+output_warp = "/Data/warp.avi"
 
 ''' Tracking parameters ''' 
 # Number of tracked position for the ball
@@ -25,14 +26,19 @@ inpWidth = 416       #Width of network's input image
 inpHeight = 416      #Height of network's input image
 
 
-''' Model Information '''
+'''YOLOV4 Model Information '''
 # Model Information 
 model_configurations = 'Model/football.cfg'
 model_weights = 'Model/football_best.weights'
 
 
+''' Deep Homo Model Information'''
+DeepHomoModel_weights = "https://storage.googleapis.com/narya-bucket-1/models/deep_homo_model.h5"
+WEIGHTS_NAME = "deep_homo_model.h5"
+WEIGHTS_TOTAR = False
+
 ''' Map Draw Configurations '''
-map_location = 'Data/Map/Football_map.png' # Image used
+map_location = 'Data/Map/world_cup_template.png' # Image used
 scale_percent = 12 # Percentage to scale image down
 
 y_offset = 850
